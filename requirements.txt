@@ -1,0 +1,5 @@
+rembg
+Pillow
+opencv-python
+onnxruntime-silicon
+numpy<2 
