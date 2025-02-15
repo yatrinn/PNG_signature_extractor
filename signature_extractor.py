@@ -4,8 +4,8 @@ PNG Signature Extractor
 
 This tool processes all PNG images in a specified input folder to extract signatures 
 by completely removing the white background. It converts each image to RGBA and then, 
-for each pixel, if all three RGB channels are greater than or equal to a specified 
-threshold (default: 240), it sets that pixel's alpha channel to 0 (fully transparent).
+for each pixel, if the red, green, and blue values are greater than a specified threshold 
+(default: 220), it sets that pixel’s alpha channel to 0 (fully transparent). 
 This ensures that only the signature (in its original color) remains visible.
 
 Optimal input: A high-quality PNG screenshot of the signature on a white background.
@@ -23,25 +23,25 @@ from PIL import Image
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def process_image(input_path, output_path, threshold=240):
+def process_image(input_path, output_path, threshold=220):
     try:
-        # Open the image in RGBA mode
+        # Open the image and convert to RGBA
         im = Image.open(input_path).convert("RGBA")
         data = np.array(im)  # shape: (height, width, 4)
         
-        # Create a mask: True for pixels where R, G, and B are all >= threshold
-        white_mask = np.all(data[..., :3] >= threshold, axis=-1)
+        # Create a mask: if R, G, and B are all greater than threshold, mark as background
+        white_mask = np.all(data[..., :3] > threshold, axis=-1)
         
-        # Set alpha channel to 0 (transparent) for white pixels; else, set to 255 (opaque)
-        data[..., 3] = np.where(white_mask, 0, 255)
+        # Set alpha channel: background pixels become transparent (0), others fully opaque (255)
+        data[..., 3] = np.where(white_mask, 0, 255).astype(np.uint8)
         
-        # Create a new image from the array and save as PNG
+        # Create new image from modified data and save as PNG
         new_im = Image.fromarray(data, "RGBA")
         new_im.save(output_path)
         logging.info(f"Output saved to: {output_path}")
         return True
     except Exception as e:
-        logging.exception(f"Error processing image {input_path}: {e}")
+        logging.exception(f"Failed to process {input_path}: {e}")
         return False
 
 def main():
@@ -50,10 +50,9 @@ def main():
     )
     parser.add_argument("input_folder", help="Path to the input folder containing PNG images.")
     parser.add_argument("output_folder", help="Path to the output folder for processed images.")
-    parser.add_argument("--threshold", type=int, default=240, help="Threshold for white pixels (default: 240)")
+    parser.add_argument("--threshold", type=int, default=220, help="Threshold for white detection (default: 220)")
     args = parser.parse_args()
     
-    # Ensure the output folder exists
     os.makedirs(args.output_folder, exist_ok=True)
     
     processed = 0
@@ -68,7 +67,6 @@ def main():
                 processed += 1
             else:
                 failed += 1
-                
     logging.info(f"Processing complete. Success: {processed}, Failed: {failed}")
 
 if __name__ == "__main__":
