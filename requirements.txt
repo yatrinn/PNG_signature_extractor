@@ -1,3 +1,5 @@
 rembg
 Pillow
-onnxruntime
+opencv-python
+onnxruntime-silicon
+"numpy<2"
