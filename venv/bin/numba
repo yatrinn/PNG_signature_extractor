@@ -1,0 +1,8 @@
+#!/Users/Notebook/2025.02.15_PNG_signature_extractor/venv/bin/python3
+# -*- coding: UTF-8 -*-
+from __future__ import print_function, division, absolute_import
+
+from numba.misc.numba_entry import main
+
+if __name__ == "__main__":
+    main()
