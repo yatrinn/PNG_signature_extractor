@@ -2,6 +2,8 @@
 
 PNG Signature Extractor is an AI-based tool that removes the white background from images containing signatures (blue or black ink) using advanced image processing and thresholding techniques.
 
+**Important:** The input file must be a PNG and should be a large, high-quality screenshot of the signature on a white background for optimal extraction.
+
 ## Features
 - Processes all images in an input folder.
 - Extracts the signature and saves it as a PNG with a transparent background.
