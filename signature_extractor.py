@@ -1,40 +1,53 @@
-#!/usr/bin/env python3
-"""
-PNG Signature Extractor
-
-This script uses a pre-trained U^2-Net model (via the rembg library) to remove the white background
-from an image containing a signature and saves the output as a PNG file.
-
-Author: Yannik Trinn
-"""
-
+import cv2
+import numpy as np
+import os
 import argparse
-from rembg import remove
-from PIL import Image
-import io
 
 def process_image(input_path, output_path):
-    # Open the input image file in binary mode
-    with open(input_path, 'rb') as infile:
-        input_data = infile.read()
+    # Load the input image
+    image = cv2.imread(input_path)
+    if image is None:
+        print(f"Error: Could not load image {input_path}")
+        return
 
-    # Remove the background using the pre-trained U^2-Net model
-    output_data = remove(input_data)
+    # Convert to grayscale
+    gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
-    # Open the output image from the byte data and save as PNG
-    output_image = Image.open(io.BytesIO(output_data))
-    output_image.save(output_path, 'PNG')
+    # Apply Otsu's thresholding (invert to capture dark signature on white)
+    ret, mask = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY_INV + cv2.THRESH_OTSU)
+
+    # Clean up the mask with morphological operations
+    kernel = np.ones((3, 3), np.uint8)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+    mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+    # Convert original image to BGRA and set the alpha channel to the mask
+    image_bgra = cv2.cvtColor(image, cv2.COLOR_BGR2BGRA)
+    image_bgra[:, :, 3] = mask
+
+    # Save the result as PNG
+    cv2.imwrite(output_path, image_bgra)
     print(f"Output saved to: {output_path}")
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Extract the signature by removing the white background from an image."
+        description="Extract signatures from all images in a folder using thresholding."
     )
-    parser.add_argument("input_image", type=str, help="Path to the input image file.")
-    parser.add_argument("output_image", type=str, help="Path to save the output PNG file.")
+    parser.add_argument("input_folder", help="Path to the input folder containing images.")
+    parser.add_argument("output_folder", help="Path to the output folder for processed images.")
     args = parser.parse_args()
 
-    process_image(args.input_image, args.output_image)
+    # Create output folder if it doesn't exist
+    os.makedirs(args.output_folder, exist_ok=True)
+
+    # Process each image file in the input folder
+    for filename in os.listdir(args.input_folder):
+        if filename.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".tif", ".tiff")):
+            input_path = os.path.join(args.input_folder, filename)
+            name, ext = os.path.splitext(filename)
+            output_filename = f"{name}_extracted.png"
+            output_path = os.path.join(args.output_folder, output_filename)
+            process_image(input_path, output_path)
 
 if __name__ == "__main__":
     main()
