@@ -2,10 +2,11 @@
 """
 PNG Signature Extractor
 
-This tool processes all PNG images in a specified input folder to extract signatures by removing the white background.
-It converts each image to RGBA and then computes the Euclidean distance from pure white for every pixel.
-If the distance is below a specified threshold (default: 50), the pixel is set to fully transparent.
-This ensures that only the signature (black, blue, etc.) remains visible.
+This tool processes all PNG images in a specified input folder to extract signatures 
+by completely removing the white background. It converts each image to RGBA and then, 
+for each pixel, if all three RGB channels are greater than or equal to a specified 
+threshold (default: 240), it sets that pixel's alpha channel to 0 (fully transparent).
+This ensures that only the signature (in its original color) remains visible.
 
 Optimal input: A high-quality PNG screenshot of the signature on a white background.
 
@@ -19,44 +20,28 @@ import logging
 import numpy as np
 from PIL import Image
 
-# Configure logging for informational messages
+# Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-def process_image(input_path, output_path, threshold=50):
-    """
-    Process an image by removing its white background.
-    
-    Parameters:
-      input_path: Path to the input PNG image.
-      output_path: Path to save the processed PNG image.
-      threshold: Maximum Euclidean distance from white (255,255,255) for a pixel to be considered background.
-                 Lower values mean stricter removal of white. Default is 50.
-    
-    Returns:
-      True if processing succeeds, False otherwise.
-    """
+def process_image(input_path, output_path, threshold=240):
     try:
-        # Open the image and convert to RGBA
+        # Open the image in RGBA mode
         im = Image.open(input_path).convert("RGBA")
-        data = np.array(im)  # shape (height, width, 4)
-
-        # Extract RGB channels and convert to float32 for distance calculation
-        rgb = data[:, :, :3].astype(np.float32)
+        data = np.array(im)  # shape: (height, width, 4)
         
-        # Compute Euclidean distance from pure white (255,255,255)
-        diff = np.linalg.norm(rgb - 255, axis=2)
+        # Create a mask: True for pixels where R, G, and B are all >= threshold
+        white_mask = np.all(data[..., :3] >= threshold, axis=-1)
         
-        # Create a new alpha channel: pixels with diff < threshold become transparent (0), else opaque (255)
-        new_alpha = np.where(diff < threshold, 0, 255).astype(np.uint8)
-        data[:, :, 3] = new_alpha
-
-        # Create a new image from the updated array and save it
-        new_im = Image.fromarray(data, mode="RGBA")
+        # Set alpha channel to 0 (transparent) for white pixels; else, set to 255 (opaque)
+        data[..., 3] = np.where(white_mask, 0, 255)
+        
+        # Create a new image from the array and save as PNG
+        new_im = Image.fromarray(data, "RGBA")
         new_im.save(output_path)
         logging.info(f"Output saved to: {output_path}")
         return True
     except Exception as e:
-        logging.exception(f"Failed to process {input_path}: {e}")
+        logging.exception(f"Error processing image {input_path}: {e}")
         return False
 
 def main():
@@ -65,12 +50,12 @@ def main():
     )
     parser.add_argument("input_folder", help="Path to the input folder containing PNG images.")
     parser.add_argument("output_folder", help="Path to the output folder for processed images.")
-    parser.add_argument("--threshold", type=int, default=50, help="Euclidean distance threshold from white. Default is 50.")
+    parser.add_argument("--threshold", type=int, default=240, help="Threshold for white pixels (default: 240)")
     args = parser.parse_args()
-
+    
     # Ensure the output folder exists
     os.makedirs(args.output_folder, exist_ok=True)
-
+    
     processed = 0
     failed = 0
     for filename in os.listdir(args.input_folder):
@@ -83,7 +68,7 @@ def main():
                 processed += 1
             else:
                 failed += 1
-
+                
     logging.info(f"Processing complete. Success: {processed}, Failed: {failed}")
 
 if __name__ == "__main__":
